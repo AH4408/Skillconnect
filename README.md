@@ -1,76 +1,94 @@
 # SkillConnect
 
-SkillConnect is a full-stack local services marketplace. It connects clients who need work done with nearby workers who can quote on jobs. The project includes separate client, worker, and administrator experiences, a React frontend, an Express API, MongoDB persistence, and Socket.IO updates.
+SkillConnect is a local services marketplace that helps clients find nearby skilled workers. Clients can post jobs and compare quotes; workers can find matching work, send quotes, and manage accepted jobs. The platform includes separate client, worker, and administrator experiences, persistent MongoDB storage, and live updates through Socket.IO.
 
-## Contents
+## Project Overview
 
-- [What it does](#what-it-does)
-- [Technology](#technology)
-- [How the app is organized](#how-the-app-is-organized)
-- [Run locally](#run-locally)
-- [Environment variables](#environment-variables)
-- [API areas](#api-areas)
-- [Real-time updates](#real-time-updates)
-- [Build](#build)
-- [Production notes and current limitations](#production-notes-and-current-limitations)
-- [Troubleshooting](#troubleshooting)
-- [Security](#security)
+Finding a reliable local professional can involve searching across several services and coordinating availability and pricing through separate channels. SkillConnect brings job posts, worker profiles, quotes, messaging, reviews, notifications, and job progress into one application. Clients describe the work they need, workers discover matching opportunities in their city, and both sides can follow the job through completion.
 
-## What it does
+The project is built as a full-stack JavaScript application. The React frontend uses an Express API for authenticated actions and stored data. MongoDB is the persistent data source, while Socket.IO distributes live events to connected users so changes such as messages, quotes, and worker availability can appear without manually refreshing the page.
 
-### Clients
+## Key Highlights
 
-- Create and manage a client profile with a city and area.
-- Post a job with its category, location, budget, and description.
-- Browse workers by city, skills, availability, and rating.
-- Review worker quotes and accept or decline an offer.
-- Track a job from posting through booking, work completion, confirmation, and payment status.
-- Chat with workers, receive notifications, and leave reviews.
-- Open a dispute for administrator review.
+- Separate experiences for clients, workers, and administrators.
+- City- and skill-based discovery for jobs and workers.
+- Job quoting, quote acceptance and decline, and worker requoting.
+- Job lifecycle tracking, cancellation handling, and dispute management.
+- In-app chat, notifications, worker reviews, and ratings.
+- JWT access tokens and refresh-token cookies for account sessions.
+- MongoDB persistence through Mongoose models.
+- Socket.IO events for live updates between connected accounts.
+- Responsive React interface built and served during development with Vite.
 
-### Workers
+## System Architecture
 
-- Create a worker profile with city, service area, skills, and biography.
-- Set availability and browse jobs that match the worker's city and skills.
-- Send a quote with a price, arrival estimate, and optional note.
-- See when a client declines a quote and submit a replacement quote while the job remains open.
-- Manage accepted work through the job pipeline, message clients, and view earnings and reviews.
-- Receive notifications about quotes, jobs, messages, and cancellations.
+```mermaid
+flowchart LR
+    Browser[React client] -->|REST requests| API[Express API]
+    Browser <-->|Socket.IO events| API
+    API --> Auth[Authentication and role checks]
+    Auth --> Modules[Application modules]
+    Modules --> DB[(MongoDB via Mongoose)]
+```
 
-### Administrators
+The browser loads an initial view of the data through the REST API. MongoDB stores application records. When relevant changes occur, the backend emits Socket.IO events to the users involved; the frontend then updates or reloads the affected data. Socket.IO prefers WebSocket and has a long-polling transport fallback for environments where WebSocket connections are unavailable. That transport fallback is separate from periodic database polling.
 
-- View dashboard data and manage users and worker verification.
-- Review jobs and bookings, cancel jobs or bookings, and manage disputes.
-- Review payments and ratings, remove reviews, and view reports.
+## User Workflows
 
-## Technology
+### Client
 
-| Area | Technologies |
+1. Create a profile with a city and optional area.
+2. Post a job with its category, location, budget, description, and timing.
+3. Browse nearby workers and review their skills, ratings, and availability.
+4. Receive and compare worker quotes, then accept or decline a quote.
+5. Message the worker, follow job progress, confirm completion, and leave a review.
+6. Open a dispute if a booking needs administrator attention.
+
+### Worker
+
+1. Create a profile with a city, service area, skills, and biography.
+2. Set online availability and find jobs matching the worker's city and skills.
+3. Send a quote with a price, arrival estimate, and optional note.
+4. Respond to quote decisions and submit a new quote after a client declines one, while the job is open.
+5. Manage accepted work, message clients, and view earnings and reviews.
+
+### Administrator
+
+- Review platform activity, users, jobs, bookings, payments, and reports.
+- Verify workers and manage accounts and reviews.
+- Review and resolve disputes.
+- Cancel a job or booking when necessary; cancellation status is sent to the affected users.
+
+## Technology Stack
+
+| Layer | Technologies |
 | --- | --- |
 | Frontend | React, Vite, Axios, Socket.IO Client |
-| Backend | Node.js, Express, Socket.IO |
+| Backend | Node.js, Express.js, Socket.IO |
 | Database | MongoDB, Mongoose |
 | Authentication | JWT access tokens and refresh-token cookies |
 
-## How the app is organized
+## Repository Structure
 
 ```text
 Skillconnect/
 ├── backend/
-│   ├── server.js             # Express and Socket.IO server entry point
-│   └── src/modules/           # Auth, clients, workers, jobs, bookings, chat, admin, etc.
+│   ├── server.js                 # Express and Socket.IO entry point
+│   └── src/
+│       ├── common/               # Shared configuration, middleware, and utilities
+│       └── modules/              # Auth, clients, workers, jobs, chat, admin, etc.
 ├── frontend/
-│   ├── src/components/        # Shared UI and dialogs
-│   ├── src/context/           # App state and backend synchronization
-│   ├── src/services/          # API clients and Socket.IO connection
-│   └── src/views/             # Client, worker, and admin experiences
+│   ├── src/
+│   │   ├── components/           # Shared UI and dialogs
+│   │   ├── context/              # App state and backend synchronization
+│   │   ├── services/             # API clients and Socket.IO connection
+│   │   └── views/                # Client, worker, and admin experiences
+│   └── vite.config.js
 ├── .gitignore
 └── README.md
 ```
 
-The browser talks to the REST API for authenticated actions and data. MongoDB is the persistent source of truth. Socket.IO carries live updates between connected accounts.
-
-## Run locally
+## Local Development
 
 ### Prerequisites
 
@@ -84,7 +102,7 @@ git clone https://github.com/AH4408/Skillconnect.git
 cd Skillconnect
 ```
 
-### 2. Configure the backend
+### 2. Install and configure the backend
 
 In Terminal 1:
 
@@ -93,7 +111,7 @@ cd backend
 npm install
 ```
 
-Create a file named `backend/.env`:
+Create `backend/.env` with your local settings:
 
 ```env
 PORT=5004
@@ -106,19 +124,23 @@ JWT_REFRESH_EXPIRES_IN=7d
 FRONTEND_URL=http://localhost:5173
 ```
 
-The example URI connects to a local MongoDB server and stores data in a database named `skillconnect`. For MongoDB Atlas, replace it with your Atlas URI. Generate two different JWT secrets; on macOS you can run `openssl rand -base64 48` twice.
+The example MongoDB URI uses a local MongoDB service. To use MongoDB Atlas, substitute your Atlas connection string. Generate separate values for the JWT secrets. On macOS or Linux, you can generate a random value with:
 
-Start the API:
+```bash
+openssl rand -base64 48
+```
+
+Start the backend:
 
 ```bash
 npm start
 ```
 
-The API is available at `http://localhost:5004`. Check that it is running at `http://localhost:5004/health`.
+The API runs at `http://localhost:5004`. Check `http://localhost:5004/health` to confirm it is running.
 
-### 3. Configure and run the frontend
+### 3. Install and run the frontend
 
-Open Terminal 2 at the repository root:
+In Terminal 2, from the repository root:
 
 ```bash
 cd frontend
@@ -127,100 +149,125 @@ cp .env.example .env
 npm run dev
 ```
 
-Open the local URL Vite prints, usually `http://localhost:5173`.
+Open the local URL printed by Vite, usually `http://localhost:5173`.
 
-The provided frontend environment example points to the local API and Socket.IO server on port `5004`. If you change the backend port, update `VITE_API_BASE_URL` and `VITE_SOCKET_URL` in `frontend/.env` to match.
+The frontend example environment file points to the local backend on port `5004`. If you use another backend port, update `VITE_API_BASE_URL` and `VITE_SOCKET_URL` in `frontend/.env` to match. Keep the frontend, backend, and MongoDB service running while using the app.
 
-Keep the backend and frontend terminals running while you use the app. MongoDB must also remain available; it may run as a separate local service.
+## Environment Variables
 
-## Environment variables
-
-### Backend
+### Backend (`backend/.env`)
 
 | Variable | Purpose |
 | --- | --- |
-| `PORT` | HTTP and Socket.IO server port; use `5004` for the included local frontend defaults. |
-| `NODE_ENV` | Runtime mode. Local registration is enabled for development. |
+| `PORT` | HTTP and Socket.IO server port. The included frontend defaults use `5004`. |
+| `NODE_ENV` | Runtime mode. |
 | `MONGODB_URI` | MongoDB connection string. |
 | `JWT_ACCESS_SECRET` | Secret used to sign access tokens. |
-| `JWT_ACCESS_EXPIRES_IN` | Access-token lifetime, for example `15m`. |
+| `JWT_ACCESS_EXPIRES_IN` | Access-token lifetime, such as `15m`. |
 | `JWT_REFRESH_SECRET` | Separate secret used to sign refresh tokens. |
-| `JWT_REFRESH_EXPIRES_IN` | Refresh-token lifetime, for example `7d`. |
-| `FRONTEND_URL` | Allowed frontend origin for CORS and Socket.IO. Defaults to `http://localhost:5173`. |
+| `JWT_REFRESH_EXPIRES_IN` | Refresh-token lifetime, such as `7d`. |
+| `FRONTEND_URL` | Frontend origin allowed for CORS and Socket.IO. |
 
-### Frontend
+### Frontend (`frontend/.env`)
 
 | Variable | Purpose |
 | --- | --- |
 | `VITE_API_BASE_URL` | Backend REST API URL, including `/api`. |
-| `VITE_SOCKET_URL` | Backend Socket.IO origin. |
-| `VITE_USE_BACKEND` | Set to `true` to use the backend-backed app. |
+| `VITE_SOCKET_URL` | Backend origin used for Socket.IO. |
+| `VITE_USE_BACKEND` | Set to `true` to use the backend-backed application. |
 
-Vite exposes `VITE_*` values to browser code, so never put passwords or private keys in frontend environment variables.
+Vite includes `VITE_*` values in browser code. Do not store passwords, database credentials, JWT secrets, or other private keys in frontend variables.
 
-## API areas
+## API Areas
 
-The API is mounted under `/api`. Most endpoints require a valid access token and role authorization.
+API routes are mounted under `/api`. Role-protected routes require a valid access token and appropriate permissions.
 
 | Prefix | Purpose |
 | --- | --- |
-| `/api/auth` | Register, sign in, refresh session, sign out, and retrieve the current account. |
+| `/api/auth` | Register, sign in, refresh a session, sign out, and retrieve the current account. |
 | `/api/client` | Client profile and dashboard data. |
-| `/api/workers` | Worker search and worker profile management. |
+| `/api/workers` | Worker search and profile management. |
 | `/api/jobs` | Create, find, update, assign, track, and cancel jobs. |
 | `/api/bookings` | Submit quotes, accept or decline quotes, and advance booking status. |
-| `/api/chats` | Create conversations, retrieve messages, send messages, and mark chats read. |
+| `/api/chats` | Create conversations, retrieve and send messages, and mark chats read. |
 | `/api/notifications` | Retrieve notifications and mark them read. |
-| `/api/reviews` | Create reviews and retrieve a worker's reviews. |
-| `/api/disputes` | Create disputes and let administrators review or resolve them. |
+| `/api/reviews` | Create reviews and retrieve worker reviews. |
+| `/api/disputes` | Create, review, and resolve disputes. |
 | `/api/payments` | View payment records, record a payment, and process an administrator refund. |
 | `/api/admin` | Administrator dashboard, account management, and operational reports. |
 
-The unauthenticated health endpoint is `GET /health`.
+The health check is `GET /health` and does not require authentication.
 
-## Real-time updates
+## Real-Time Updates
 
-Socket.IO authenticates connections with the access token and assigns each user to server-controlled rooms. Events include job availability, worker presence, booking and quote changes, chat messages, notifications, and administrator refreshes.
+Socket.IO authenticates connections using the user's access token and places connected users in server-controlled rooms. Events cover worker presence, job availability, bookings and quotes, chat messages, notifications, and administrator updates.
 
-The frontend fetches an initial snapshot through REST and re-fetches authoritative data after relevant Socket.IO events or reconnection. There is no periodic jobs polling loop. Socket.IO is configured with WebSocket transport and long-polling fallback if a WebSocket connection cannot be used.
+The frontend first fetches current data through REST. It then responds to relevant Socket.IO events and reconnections by updating or fetching the affected data again. There is no recurring job-data polling loop. Socket.IO's long-polling option is only a connection transport fallback when WebSocket cannot be used; it does not mean every transport request performs a MongoDB query.
+
+## Engineering Decisions
+
+### Why React and Vite?
+
+React provides reusable components for the distinct client, worker, and administrator screens. Vite provides the frontend development server and creates the optimized static production build.
+
+### Why Express and MongoDB?
+
+Express exposes the API and applies authentication and role checks before module operations. MongoDB with Mongoose stores users, profiles, jobs, quotes, bookings, messages, reviews, notifications, and other application records.
+
+### Why Socket.IO?
+
+The application needs to show changes such as a new message or a worker going offline without requiring a user to reload the page. Socket.IO lets the backend send events to connected users and supports a fallback transport for restrictive networks.
 
 ## Build
 
-Create a production frontend build with:
+Build the frontend for production:
 
 ```bash
 cd frontend
 npm run build
 ```
 
-The generated static assets are written to `frontend/dist/` and are ignored by Git.
+Vite writes the generated site to `frontend/dist/`. The build output is generated locally and should not be committed.
 
-## Production notes and current limitations
+## Deployment Notes and Current Limitations
 
-- GitHub stores this repository's source code; it does not host the running full-stack app. A live deployment needs a frontend host, a backend host that supports persistent Socket.IO connections, and a MongoDB database.
-- Set production environment variables in the hosting provider. Use HTTPS origins, an Atlas connection string, and newly generated secrets. Do not reuse local development secrets.
-- The frontend must use the deployed API origin in `VITE_API_BASE_URL` and the deployed backend origin in `VITE_SOCKET_URL`. Configure the backend's `FRONTEND_URL` to allow the deployed frontend origin.
+- GitHub stores the source code; it does not run the complete application. The backend needs a Node.js host that supports persistent Socket.IO connections, and the app needs an accessible MongoDB database.
+- GitHub Pages can host a static frontend for a temporary visual demo, but it cannot host the Express API or MongoDB. Backend-dependent features require a separately deployed backend and database.
+- For a full deployment, set production values for the frontend API and Socket.IO URLs and configure the backend's `FRONTEND_URL` for the deployed frontend origin.
+- Use HTTPS, strong unique secrets, and a managed MongoDB deployment in production. Never reuse development credentials.
 - Payment records currently use a demo transaction ID; no external payment gateway is integrated.
-- Email verification delivery is currently disabled in the registration service. Production account signup and verification need to be configured before relying on that flow.
-- The backend currently exposes `npm start`; there is no separate backend development/watch script.
+- Email verification delivery is currently disabled in the registration service and must be configured before relying on that flow in production.
+- The backend currently provides an `npm start` script; a separate development/watch script is not configured.
 
 ## Troubleshooting
 
-### Frontend cannot reach the API
+### The frontend cannot reach the API
 
-Make sure MongoDB and the backend are running. Check `http://localhost:5004/health` and confirm `frontend/.env` points to port `5004`.
+Confirm MongoDB and the backend are running. Open `http://localhost:5004/health`, and check that `frontend/.env` points to the correct API and Socket.IO URLs.
 
-### MongoDB connection fails
+### MongoDB fails to connect
 
-Start your local MongoDB service or check that `MONGODB_URI` points to a reachable database. For Atlas, verify the URI and network access rules.
+Start the local MongoDB service or verify that `MONGODB_URI` points to a reachable database. For Atlas, check the connection string and network access settings.
 
 ### A worker does not see a job
 
-Check that the worker profile has the same city and a matching skill/category as the job. The backend filters available jobs by both.
+Check that the worker profile city matches the job city and that the worker has a skill matching the job category. Also confirm the job is open and the backend is connected to the expected database.
+
+### Changes do not appear until reload
+
+Confirm both accounts are connected to the same backend, the backend is running, and the browser has a valid authenticated Socket.IO connection. Reloading fetches a fresh REST snapshot, but live updates require the socket connection to remain active.
 
 ## Security
 
-- Never commit `.env` files, database credentials, JWT secrets, or SMTP passwords.
-- The root and backend `.gitignore` files exclude local environment files and generated dependencies/build output.
-- Keep secrets in local environment files or your hosting provider's secret manager.
-- Admin accounts are platform accounts and cannot be created through public registration.
+- Do not commit `.env` files, database credentials, JWT secrets, SMTP passwords, or production tokens.
+- Root and backend `.gitignore` rules exclude local environment files, generated dependencies, and build output.
+- Store production secrets in the hosting provider's secret manager.
+- Administrator accounts are platform accounts and cannot be created through public registration.
+
+## Future Improvements
+
+- Integrate a real payment gateway.
+- Configure and verify email delivery for account verification and notifications.
+- Add automated backend and frontend test coverage.
+- Improve deployment automation for the frontend and backend.
+- Add production monitoring, structured logging, and backup procedures.
