@@ -1,0 +1,1 @@
+import {useState} from 'react';export function useToast(){const [toast,setToast]=useState(null);const show=(message,type='info')=>{setToast({message,type});setTimeout(()=>setToast(null),2600)};return {toast,show}}export default function Toast({toast}){return toast?<div className={`toast ${toast.type}`}><i className="fa-solid fa-circle-info"/> {toast.message}</div>:null}

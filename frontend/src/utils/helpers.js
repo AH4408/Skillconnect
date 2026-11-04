@@ -1,0 +1,1 @@
+export const money=n=>n==null?'—':`₹${Number(n).toLocaleString('en-IN')}`;export const timeAgo=d=>{if(!d)return'';const x=Date.now()-new Date(d).getTime(),m=Math.floor(x/60000);if(m<60)return `${Math.max(1,m)}m ago`;const h=Math.floor(m/60);if(h<24)return `${h}h ago`;return `${Math.floor(h/24)}d ago`};export const statusClass=s=>String(s||'').toLowerCase().replaceAll(' ','-');
