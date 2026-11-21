@@ -222,20 +222,17 @@ sequenceDiagram
     participant API as Express API
     participant DB as MongoDB
 
-    Browser->>API: Sign in with email and password
-    API->>DB: Find user and verify password hash
-    API->>DB: Store hash of refresh token
-    API-->>Browser: Return access JWT and set HttpOnly refresh cookie
-    Browser->>API: Send API request with Bearer access token
-    API-->>Browser: Return protected response
-    Browser->>API: Request new access token with refresh cookie
-    API->>DB: Verify stored refresh-token hash
-    API-->>Browser: Return new access JWT
+    Browser->>API: Sign in
+    API->>DB: Verify password
+    API-->>Browser: Access JWT and HttpOnly refresh cookie
+    Browser->>API: Request with access JWT
+    Browser->>API: Refresh request with cookie
+    API->>DB: Verify refresh-token hash
+    API-->>Browser: New access JWT
     Browser->>API: Sign out
-    API->>DB: Clear refresh-token hash
-    API-->>Browser: Clear refresh cookie
-```
+    API->>DB: Revoke refresh token
 
+    
 ### Sign-out and role authorization
 
 `POST /api/auth/logout` requires a valid access token. The backend clears the saved refresh-token hash and expires the refresh cookie; the frontend also removes its access token and cached account from local storage. This invalidates refresh-based session restoration, while an already issued access token remains valid until its short expiration. Protected route groups use role authorization for client, worker, and administrator actions. Administrator accounts are provisioned by the platform, not through public registration.
