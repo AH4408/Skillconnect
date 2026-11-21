@@ -217,6 +217,7 @@ At sign-in, the backend looks up the account, compares the submitted password wi
 
 When a protected API request gets a `401`, the frontend API interceptor calls `POST /api/auth/refresh` with credentials so the browser sends the HttpOnly cookie. The backend verifies the refresh JWT, hashes it, and compares the hash with the stored value. If valid, it returns a new access token; the frontend saves it and retries the original request once. On app startup, if there is no access token in local storage, the frontend first tries the refresh endpoint, then requests `GET /api/auth/me` to restore the signed-in account and load its application data.
 
+```mermaid
 sequenceDiagram
     participant Browser
     participant API as Express API
@@ -231,6 +232,7 @@ sequenceDiagram
     API-->>Browser: New access JWT
     Browser->>API: Sign out
     API->>DB: Revoke refresh token
+```
 
     
 ### Sign-out and role authorization
