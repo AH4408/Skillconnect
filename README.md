@@ -198,6 +198,64 @@ API routes are mounted under `/api`. Role-protected routes require a valid acces
 
 The health check is `GET /health` and does not require authentication.
 
+## Authentication System
+
+SkillConnect uses short-lived JWT access tokens for API authorization and a longer-lived refresh token for restoring a session. The backend handles credential checks and signs tokens; the frontend attaches the access token to API requests and asks the backend for a replacement when an API request returns an expired-token `401`.
+
+### Registration and password storage
+
+`POST /api/auth/register` accepts a name, email, password, and client or worker role. A Joi DTO validates the input, lowercases the email, enforces the password minimum, and does not allow public registration as an administrator. The user model hashes passwords with bcryptjs (12 rounds) before storing them. Password and token-hash fields are excluded from normal user queries.
+
+In development, newly registered accounts are marked verified so local testing can proceed. In production, registration currently leaves accounts unverified, but verification email delivery is not enabled yet; production registration therefore needs email delivery configured before users can complete that flow.
+
+### Sign-in, access, and refresh
+
+At sign-in, the backend looks up the account, compares the submitted password with its bcrypt hash, and requires the account to be verified. It then issues:
+
+- An **access token**, signed with `JWT_ACCESS_SECRET` and configured by `JWT_ACCESS_EXPIRES_IN` (15 minutes by default). The frontend stores this token in `localStorage` and sends it as `Authorization: Bearer <token>` on API requests. Protected routes verify the token and load the current account and role.
+- A **refresh token**, signed with the separate `JWT_REFRESH_SECRET` and configured by `JWT_REFRESH_EXPIRES_IN` (7 days by default). The backend stores only a SHA-256 hash of this token on the user record and sends the raw token to the browser in an `HttpOnly` cookie. The cookie is `Secure` and `SameSite=None` in production; local development uses `SameSite=Lax`.
+
+When a protected API request gets a `401`, the frontend API interceptor calls `POST /api/auth/refresh` with credentials so the browser sends the HttpOnly cookie. The backend verifies the refresh JWT, hashes it, and compares the hash with the stored value. If valid, it returns a new access token; the frontend saves it and retries the original request once. On app startup, if there is no access token in local storage, the frontend first tries the refresh endpoint, then requests `GET /api/auth/me` to restore the signed-in account and load its application data.
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant API as Express API
+    participant DB as MongoDB
+
+    Browser->>API: POST /api/auth/login (email and password)
+    API->>DB: Find account and compare bcrypt password hash
+    API->>API: Sign short-lived access JWT and refresh JWT
+    API->>DB: Save SHA-256 hash of refresh JWT
+    API-->>Browser: Access JWT in response; refresh JWT in HttpOnly cookie
+    Browser->>API: API request with Authorization: Bearer access JWT
+    API->>API: Verify access JWT and authorize account role
+    Note over Browser,API: On 401, frontend attempts one refresh and retries once
+    Browser->>API: POST /api/auth/refresh (browser sends cookie)
+    API->>DB: Compare hash of refresh JWT with stored hash
+    API-->>Browser: New access JWT
+    Browser->>API: POST /api/auth/logout
+    API->>DB: Clear stored refresh-token hash
+    API-->>Browser: Clear refresh-token cookie
+```
+
+### Sign-out and role authorization
+
+`POST /api/auth/logout` requires a valid access token. The backend clears the saved refresh-token hash and expires the refresh cookie; the frontend also removes its access token and cached account from local storage. This invalidates refresh-based session restoration, while an already issued access token remains valid until its short expiration. Protected route groups use role authorization for client, worker, and administrator actions. Administrator accounts are provisioned by the platform, not through public registration.
+
+### Authentication endpoints
+
+| Endpoint | Purpose |
+| --- | --- |
+| `POST /api/auth/register` | Create a client or worker account. |
+| `POST /api/auth/login` | Verify credentials and issue the access token and refresh cookie. |
+| `POST /api/auth/refresh` | Validate the refresh cookie and issue a new access token. |
+| `POST /api/auth/logout` | Invalidate refresh-based session restoration and clear the cookie. |
+| `GET /api/auth/me` | Return the current authenticated account. |
+| `GET /api/auth/verify-email/:token` | Verify an account using a verification token. |
+
+Access and refresh signing secrets must be different, long, and private. Do not put them in frontend environment variables or commit them to Git.
+
 ## Real-Time Updates
 
 Socket.IO authenticates connections using the user's access token and places connected users in server-controlled rooms. Events cover worker presence, job availability, bookings and quotes, chat messages, notifications, and administrator updates.
