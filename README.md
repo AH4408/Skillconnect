@@ -202,20 +202,11 @@ The health check is `GET /health` and does not require authentication.
 
 SkillConnect uses short-lived JWT access tokens for API authorization and a longer-lived refresh token for restoring a session. The backend handles credential checks and signs tokens; the frontend attaches the access token to API requests and asks the backend for a replacement when an API request returns an expired-token `401`.
 
-### Registration and password storage
+### Registration and Sign-in
 
-`POST /api/auth/register` accepts a name, email, password, and client or worker role. A Joi DTO validates the input, lowercases the email, enforces the password minimum, and does not allow public registration as an administrator. The user model hashes passwords with bcryptjs (12 rounds) before storing them. Password and token-hash fields are excluded from normal user queries.
+Registration validates the name, email, password, and account role. Passwords are stored as bcrypt hashes, and public registration is limited to client and worker accounts. Email verification is enabled differently in development and production; production email delivery still needs configuration.
 
-In development, newly registered accounts are marked verified so local testing can proceed. In production, registration currently leaves accounts unverified, but verification email delivery is not enabled yet; production registration therefore needs email delivery configured before users can complete that flow.
-
-### Sign-in, access, and refresh
-
-At sign-in, the backend looks up the account, compares the submitted password with its bcrypt hash, and requires the account to be verified. It then issues:
-
-- An **access token**, signed with `JWT_ACCESS_SECRET` and configured by `JWT_ACCESS_EXPIRES_IN` (15 minutes by default). The frontend stores this token in `localStorage` and sends it as `Authorization: Bearer <token>` on API requests. Protected routes verify the token and load the current account and role.
-- A **refresh token**, signed with the separate `JWT_REFRESH_SECRET` and configured by `JWT_REFRESH_EXPIRES_IN` (7 days by default). The backend stores only a SHA-256 hash of this token on the user record and sends the raw token to the browser in an `HttpOnly` cookie. The cookie is `Secure` and `SameSite=None` in production; local development uses `SameSite=Lax`.
-
-When a protected API request gets a `401`, the frontend API interceptor calls `POST /api/auth/refresh` with credentials so the browser sends the HttpOnly cookie. The backend verifies the refresh JWT, hashes it, and compares the hash with the stored value. If valid, it returns a new access token; the frontend saves it and retries the original request once. On app startup, if there is no access token in local storage, the frontend first tries the refresh endpoint, then requests `GET /api/auth/me` to restore the signed-in account and load its application data.
+After login, the backend issues a short-lived access token and stores a hash of the refresh token in the database, sending the token itself in an HttpOnly cookie. The frontend uses the access token for API requests and, when it expires, exchanges the cookie for a new one and retries the request. On startup, it can use the refresh cookie to restore the signed-in account; logout clears the cookie and revokes the refresh token.
 
 ```mermaid
 sequenceDiagram
