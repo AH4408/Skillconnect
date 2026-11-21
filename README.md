@@ -217,26 +217,23 @@ At sign-in, the backend looks up the account, compares the submitted password wi
 
 When a protected API request gets a `401`, the frontend API interceptor calls `POST /api/auth/refresh` with credentials so the browser sends the HttpOnly cookie. The backend verifies the refresh JWT, hashes it, and compares the hash with the stored value. If valid, it returns a new access token; the frontend saves it and retries the original request once. On app startup, if there is no access token in local storage, the frontend first tries the refresh endpoint, then requests `GET /api/auth/me` to restore the signed-in account and load its application data.
 
-```mermaid
 sequenceDiagram
     participant Browser
     participant API as Express API
     participant DB as MongoDB
 
-    Browser->>API: POST /api/auth/login (email and password)
-    API->>DB: Find account and compare bcrypt password hash
-    API->>API: Sign short-lived access JWT and refresh JWT
-    API->>DB: Save SHA-256 hash of refresh JWT
-    API-->>Browser: Access JWT in response; refresh JWT in HttpOnly cookie
-    Browser->>API: API request with Authorization: Bearer access JWT
-    API->>API: Verify access JWT and authorize account role
-    Note over Browser,API: On 401, frontend attempts one refresh and retries once
-    Browser->>API: POST /api/auth/refresh (browser sends cookie)
-    API->>DB: Compare hash of refresh JWT with stored hash
-    API-->>Browser: New access JWT
-    Browser->>API: POST /api/auth/logout
-    API->>DB: Clear stored refresh-token hash
-    API-->>Browser: Clear refresh-token cookie
+    Browser->>API: Sign in with email and password
+    API->>DB: Find user and verify password hash
+    API->>DB: Store hash of refresh token
+    API-->>Browser: Return access JWT and set HttpOnly refresh cookie
+    Browser->>API: Send API request with Bearer access token
+    API-->>Browser: Return protected response
+    Browser->>API: Request new access token with refresh cookie
+    API->>DB: Verify stored refresh-token hash
+    API-->>Browser: Return new access JWT
+    Browser->>API: Sign out
+    API->>DB: Clear refresh-token hash
+    API-->>Browser: Clear refresh cookie
 ```
 
 ### Sign-out and role authorization
